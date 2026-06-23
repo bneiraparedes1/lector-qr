@@ -2,318 +2,163 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lector QR Cédula de Identidad</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Lector QR Cédula</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-
   :root {
-    --bg: #0f1117;
-    --surface: #1a1d27;
-    --card: #22263a;
-    --accent: #3b82f6;
-    --accent2: #6366f1;
-    --success: #10b981;
-    --danger: #ef4444;
-    --text: #e8eaf0;
-    --muted: #6b7280;
-    --border: #2d3148;
+    --bg: #0f1117; --surface: #1a1d27; --card: #22263a;
+    --accent: #3b82f6; --accent2: #6366f1; --success: #10b981;
+    --danger: #ef4444; --text: #e8eaf0; --muted: #6b7280; --border: #2d3148;
   }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
 
   header {
-    width: 100%;
-    padding: 20px 24px;
-    background: var(--surface);
+    padding: 16px 20px; background: var(--surface);
     border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 14px;
+    display: flex; align-items: center; gap: 12px;
   }
-
   .logo {
-    width: 38px; height: 38px;
+    width: 36px; height: 36px;
     background: linear-gradient(135deg, var(--accent), var(--accent2));
-    border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 20px;
-    flex-shrink: 0;
+    border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px;
   }
+  header h1 { font-size: 1rem; font-weight: 700; }
+  header p { font-size: 0.72rem; color: var(--muted); }
 
-  header h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; }
-  header p { font-size: 0.78rem; color: var(--muted); margin-top: 1px; }
+  .section { padding: 16px; }
 
-  main {
-    width: 100%;
-    max-width: 900px;
-    padding: 28px 20px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-  }
-
-  @media (max-width: 640px) {
-    main { grid-template-columns: 1fr; }
-  }
-
-  .card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    overflow: hidden;
-  }
-
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; margin-bottom: 16px; }
   .card-header {
-    padding: 14px 18px;
-    border-bottom: 1px solid var(--border);
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+    font-size: 0.75rem; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .06em;
   }
 
-  /* --- SCANNER --- */
-  .scanner-wrap {
-    position: relative;
-    background: #000;
-    aspect-ratio: 4/3;
-  }
-
-  #video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-
+  /* Scanner */
+  .scanner-wrap { position: relative; background: #000; width: 100%; aspect-ratio: 4/3; }
+  #video { width: 100%; height: 100%; object-fit: cover; display: block; }
   #canvas { display: none; }
 
   .scanner-overlay {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
     pointer-events: none;
   }
-
-  .finder {
-    width: 180px; height: 180px;
-    position: relative;
+  .finder { width: 200px; height: 200px; position: relative; }
+  .finder::before, .finder::after, .finder span::before, .finder span::after {
+    content: ''; position: absolute; width: 32px; height: 32px;
+    border-color: var(--accent); border-style: solid;
   }
-
-  .finder::before, .finder::after,
-  .finder span::before, .finder span::after {
-    content: '';
-    position: absolute;
-    width: 28px; height: 28px;
-    border-color: var(--accent);
-    border-style: solid;
-  }
-
-  .finder::before  { top: 0;    left: 0;  border-width: 3px 0 0 3px; }
-  .finder::after   { top: 0;    right: 0; border-width: 3px 3px 0 0; }
+  .finder::before  { top: 0; left: 0;  border-width: 3px 0 0 3px; }
+  .finder::after   { top: 0; right: 0; border-width: 3px 3px 0 0; }
   .finder span::before { bottom: 0; left: 0;  border-width: 0 0 3px 3px; }
   .finder span::after  { bottom: 0; right: 0; border-width: 0 3px 3px 0; }
-
   .scan-line {
-    position: absolute;
-    left: 4px; right: 4px;
-    height: 2px;
+    position: absolute; left: 4px; right: 4px; height: 2px;
     background: linear-gradient(90deg, transparent, var(--accent), transparent);
-    animation: sweep 2s ease-in-out infinite;
-    top: 4px;
+    animation: sweep 2s ease-in-out infinite; top: 4px;
   }
-
   @keyframes sweep {
     0%   { top: 4px;   opacity: 1; }
-    90%  { top: 168px; opacity: 1; }
+    90%  { top: 190px; opacity: 1; }
     100% { top: 4px;   opacity: 0; }
   }
 
   .no-camera {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    aspect-ratio: 4/3;
-    gap: 12px;
-    color: var(--muted);
-    font-size: 0.85rem;
-    text-align: center;
-    padding: 20px;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; aspect-ratio: 4/3; gap: 14px;
+    color: var(--muted); font-size: 0.85rem; text-align: center; padding: 20px;
   }
-
   .no-camera .icon { font-size: 3rem; }
 
-  /* status pill */
+  /* controls */
+  .cam-controls {
+    padding: 10px 14px; border-top: 1px solid var(--border);
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  }
+
   .status-bar {
-    padding: 10px 18px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.82rem;
+    padding: 10px 16px; display: flex; align-items: center; gap: 8px; font-size: 0.82rem;
   }
-
-  .dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
   .dot.scanning { background: var(--accent); animation: pulse 1.2s infinite; }
   .dot.ok       { background: var(--success); }
   .dot.idle     { background: var(--muted); }
-
-  @keyframes pulse {
-    0%,100% { opacity: 1; }
-    50% { opacity: 0.3; }
-  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 
   .btn {
-    border: none; cursor: pointer;
-    font-size: 0.82rem; font-weight: 600;
-    border-radius: 8px;
-    padding: 8px 16px;
-    transition: opacity .15s, transform .1s;
+    border: none; cursor: pointer; font-size: 0.82rem; font-weight: 600;
+    border-radius: 8px; padding: 9px 16px;
+    transition: opacity .15s, transform .1s; -webkit-tap-highlight-color: transparent;
   }
-  .btn:active { transform: scale(.97); }
+  .btn:active { transform: scale(.96); }
   .btn:disabled { opacity: .4; cursor: default; }
-
   .btn-primary { background: var(--accent); color: #fff; }
   .btn-success { background: var(--success); color: #fff; }
   .btn-danger  { background: var(--danger);  color: #fff; }
   .btn-ghost   { background: var(--border);  color: var(--text); }
+  .btn-sm      { padding: 6px 12px; font-size: 0.78rem; }
 
-  /* --- TABLA --- */
-  .table-wrap {
-    overflow-y: auto;
-    max-height: 340px;
+  /* tip */
+  .tip {
+    background: rgba(59,130,246,.1); border: 1px solid rgba(59,130,246,.25);
+    border-radius: 10px; padding: 10px 14px; font-size: 0.78rem;
+    color: #93c5fd; margin: 0 16px 16px;
   }
 
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.83rem;
-  }
-
+  /* tabla */
+  .table-wrap { overflow-y: auto; max-height: 260px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
   thead th {
-    position: sticky; top: 0;
-    background: var(--surface);
-    padding: 10px 14px;
-    text-align: left;
-    font-weight: 600;
-    color: var(--muted);
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: .06em;
-    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; background: var(--surface);
+    padding: 9px 12px; text-align: left; font-weight: 600;
+    color: var(--muted); font-size: 0.72rem; text-transform: uppercase;
+    letter-spacing: .06em; border-bottom: 1px solid var(--border);
   }
+  tbody tr { border-bottom: 1px solid var(--border); }
+  tbody td { padding: 9px 12px; }
+  .td-num  { color: var(--muted); width: 32px; font-size: 0.75rem; }
+  .td-run  { color: var(--accent); font-weight: 700; font-family: 'Courier New', monospace; letter-spacing: .04em; }
+  .td-time { color: var(--muted); font-size: 0.72rem; }
+  .empty-state { padding: 36px; text-align: center; color: var(--muted); font-size: 0.82rem; }
 
-  tbody tr {
-    border-bottom: 1px solid var(--border);
-    transition: background .12s;
-  }
-
-  tbody tr:hover { background: rgba(59,130,246,.07); }
-
-  tbody td {
-    padding: 9px 14px;
-    font-family: 'Courier New', monospace;
-    font-size: 0.85rem;
-  }
-
-  .td-num { color: var(--muted); width: 36px; }
-  .td-run { color: var(--accent); font-weight: 600; letter-spacing: .04em; }
-  .td-time { color: var(--muted); font-size: 0.75rem; font-family: inherit; }
-
-  .empty-state {
-    padding: 40px 20px;
-    text-align: center;
-    color: var(--muted);
-    font-size: 0.85rem;
-  }
-
-  /* bottom toolbar */
   .toolbar {
-    padding: 12px 18px;
-    border-top: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    flex-wrap: wrap;
+    padding: 12px 16px; border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
   }
-
   .count-badge {
-    background: var(--border);
-    color: var(--muted);
-    border-radius: 6px;
-    padding: 3px 10px;
-    font-size: 0.78rem;
-    font-weight: 600;
+    background: var(--border); color: var(--muted);
+    border-radius: 6px; padding: 3px 10px; font-size: 0.75rem; font-weight: 600;
   }
 
-  /* toast */
-  #toast {
-    position: fixed;
-    bottom: 24px; left: 50%;
-    transform: translateX(-50%) translateY(80px);
-    background: var(--success);
-    color: #fff;
-    padding: 10px 20px;
-    border-radius: 10px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    transition: transform .3s;
-    pointer-events: none;
-    z-index: 99;
-    white-space: nowrap;
-  }
-
-  #toast.show { transform: translateX(-50%) translateY(0); }
-  #toast.error { background: var(--danger); }
-
-  /* manual input */
   .manual-section {
-    padding: 12px 18px;
-    border-top: 1px solid var(--border);
-    display: flex;
-    gap: 8px;
+    padding: 10px 16px; border-top: 1px solid var(--border); display: flex; gap: 8px;
   }
-
   .manual-section input {
-    flex: 1;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 8px;
-    padding: 7px 12px;
-    font-size: 0.85rem;
-    outline: none;
-    font-family: 'Courier New', monospace;
+    flex: 1; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); border-radius: 8px; padding: 8px 12px;
+    font-size: 0.85rem; outline: none; font-family: 'Courier New', monospace;
   }
-
   .manual-section input:focus { border-color: var(--accent); }
   .manual-section input::placeholder { color: var(--muted); }
 
-  .span2 { grid-column: span 2; }
-  @media (max-width: 640px) { .span2 { grid-column: span 1; } }
+  #toast {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--success); color: #fff;
+    padding: 10px 20px; border-radius: 10px;
+    font-size: 0.85rem; font-weight: 600;
+    transition: transform .3s; pointer-events: none; z-index: 99; white-space: nowrap;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+  #toast.error { background: var(--danger); }
+
+  /* flash feedback */
+  .flash { animation: flashGreen .4s ease-out; }
+  @keyframes flashGreen { 0%{background:rgba(16,185,129,.4)} 100%{background:transparent} }
 </style>
 </head>
 <body>
@@ -322,86 +167,74 @@
   <div class="logo">🪪</div>
   <div>
     <h1>Lector QR — Cédula de Identidad</h1>
-    <p>Escanea el código QR del dorso de la cédula chilena</p>
+    <p>Escanea el QR del dorso de la cédula chilena</p>
   </div>
 </header>
 
-<main>
+<div class="section">
+
   <!-- CÁMARA -->
   <div class="card">
     <div class="card-header">📷 Cámara</div>
-    <div id="scannerArea">
-      <div class="no-camera" id="noCam">
-        <div class="icon">📷</div>
-        <div>Presiona <strong>Iniciar cámara</strong><br>para comenzar el escaneo</div>
-        <button class="btn btn-primary" onclick="startCamera()">Iniciar cámara</button>
-      </div>
-      <div class="scanner-wrap" id="scannerWrap" style="display:none">
+    <div id="noCam" class="no-camera">
+      <div class="icon">📷</div>
+      <div>Presiona el botón para iniciar la cámara</div>
+      <button class="btn btn-primary" onclick="startCamera()">Iniciar cámara</button>
+    </div>
+    <div id="scannerWrap" style="display:none">
+      <div class="scanner-wrap">
         <video id="video" playsinline autoplay muted></video>
         <canvas id="canvas"></canvas>
         <div class="scanner-overlay">
-          <div class="finder">
-            <span></span>
-            <div class="scan-line"></div>
-          </div>
+          <div class="finder"><span></span><div class="scan-line"></div></div>
         </div>
+      </div>
+      <div class="cam-controls">
+        <button class="btn btn-ghost btn-sm" onclick="toggleTorch()" id="btnTorch">🔦 Linterna</button>
+        <button class="btn btn-ghost btn-sm" onclick="stopCamera()">⏹ Detener</button>
+        <span style="font-size:.72rem;color:var(--muted);margin-left:auto">Acerca la cédula al recuadro</span>
       </div>
     </div>
     <div class="status-bar">
       <div class="dot idle" id="statusDot"></div>
       <span id="statusText">Cámara inactiva</span>
     </div>
-    <div class="manual-section">
-      <input type="text" id="manualInput" placeholder="RUN manual: 12345678-9" maxlength="12">
-      <button class="btn btn-ghost" onclick="addManual()">+ Agregar</button>
-    </div>
+  </div>
+
+  <div class="tip">
+    💡 <strong>Consejo:</strong> El QR está en el <strong>dorso de la cédula</strong>. Mantén la cédula quieta a unos 10–15 cm de la cámara y bien iluminada.
   </div>
 
   <!-- TABLA -->
   <div class="card">
     <div class="card-header">📋 RUNs capturados</div>
     <div class="table-wrap">
-      <table id="runTable">
-        <thead>
-          <tr>
-            <th class="td-num">#</th>
-            <th>RUN</th>
-            <th>Hora</th>
-            <th></th>
-          </tr>
-        </thead>
+      <table>
+        <thead><tr>
+          <th class="td-num">#</th>
+          <th>RUN</th>
+          <th>Fecha / Hora</th>
+          <th></th>
+        </tr></thead>
         <tbody id="tableBody">
           <tr><td colspan="4"><div class="empty-state">Sin registros aún</div></td></tr>
         </tbody>
       </table>
     </div>
+    <div class="manual-section">
+      <input type="text" id="manualInput" placeholder="RUN manual: 12345678-9" maxlength="12" inputmode="text">
+      <button class="btn btn-ghost btn-sm" onclick="addManual()">+ Agregar</button>
+    </div>
     <div class="toolbar">
       <span class="count-badge" id="countBadge">0 registros</span>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-danger" onclick="clearAll()" id="btnClear" disabled>Limpiar</button>
-        <button class="btn btn-success" onclick="exportExcel()" id="btnExport" disabled>⬇ Exportar Excel</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-danger btn-sm" onclick="clearAll()" id="btnClear" disabled>Limpiar</button>
+        <button class="btn btn-success btn-sm" onclick="exportExcel()" id="btnExport" disabled>⬇ Excel</button>
       </div>
     </div>
   </div>
 
-  <!-- INSTRUCCIONES -->
-  <div class="card span2" style="padding:18px 20px">
-    <div style="font-size:0.82rem;color:var(--muted);display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px">
-      <div>
-        <div style="color:var(--text);font-weight:600;margin-bottom:4px">📌 ¿Cómo usar?</div>
-        Apunta la cámara al <strong>código QR del dorso</strong> de la cédula de identidad chilena. El RUN se captura automáticamente.
-      </div>
-      <div>
-        <div style="color:var(--text);font-weight:600;margin-bottom:4px">🔍 Formato QR</div>
-        El QR de la cédula chilena contiene texto como <code style="background:var(--border);padding:1px 5px;border-radius:4px">RUN=12345678-9</code>. La app extrae ese valor.
-      </div>
-      <div>
-        <div style="color:var(--text);font-weight:600;margin-bottom:4px">📊 Excel</div>
-        Los datos se exportan a <strong>.xlsx</strong> con columnas: N°, RUN, Fecha y Hora. Los duplicados se evitan automáticamente.
-      </div>
-    </div>
-  </div>
-</main>
+</div><!-- /section -->
 
 <div id="toast"></div>
 
@@ -409,6 +242,8 @@
   let stream = null;
   let scanning = false;
   let animFrame = null;
+  let torchOn = false;
+  let lastScan = 0;
   const runs = [];
   const seenRuns = new Set();
 
@@ -418,60 +253,136 @@
   const dot     = document.getElementById('statusDot');
   const statusT = document.getElementById('statusText');
   const tbody   = document.getElementById('tableBody');
-  const countB  = document.getElementById('countBadge');
-  const btnExp  = document.getElementById('btnExport');
-  const btnClr  = document.getElementById('btnClear');
 
   async function startCamera() {
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } }
-      });
+      // iPhone necesita estas constraints específicas para QR
+      const constraints = {
+        video: {
+          facingMode: { ideal: 'environment' },
+          width:  { ideal: 1920 },
+          height: { ideal: 1080 },
+          focusMode: 'continuous',
+          zoom: 1
+        }
+      };
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
       video.srcObject = stream;
+      await video.play();
       document.getElementById('noCam').style.display = 'none';
       document.getElementById('scannerWrap').style.display = 'block';
       scanning = true;
       setStatus('scanning', 'Escaneando...');
       scanLoop();
-    } catch (e) {
-      showToast('No se pudo acceder a la cámara', true);
+    } catch(e) {
+      showToast('No se pudo acceder a la cámara: ' + e.message, true);
+    }
+  }
+
+  function stopCamera() {
+    scanning = false;
+    if (animFrame) cancelAnimationFrame(animFrame);
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = null;
+    document.getElementById('noCam').style.display = 'flex';
+    document.getElementById('scannerWrap').style.display = 'none';
+    setStatus('idle', 'Cámara inactiva');
+  }
+
+  async function toggleTorch() {
+    if (!stream) return;
+    const track = stream.getVideoTracks()[0];
+    if (!track) return;
+    try {
+      torchOn = !torchOn;
+      await track.applyConstraints({ advanced: [{ torch: torchOn }] });
+      document.getElementById('btnTorch').textContent = torchOn ? '🔦 Linterna ON' : '🔦 Linterna';
+    } catch(e) {
+      showToast('Linterna no disponible', true);
     }
   }
 
   function scanLoop() {
     if (!scanning) return;
     if (video.readyState === video.HAVE_ENOUGH_DATA) {
-      canvas.width  = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0);
-      const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
-      if (code) processQR(code.data);
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+      if (vw && vh) {
+        canvas.width  = vw;
+        canvas.height = vh;
+        ctx.drawImage(video, 0, 0, vw, vh);
+
+        // Intento 1: imagen completa normal
+        let code = tryDecode(ctx.getImageData(0, 0, vw, vh));
+
+        // Intento 2: recorte central (zona del finder)
+        if (!code) {
+          const cx = Math.floor(vw * 0.15), cy = Math.floor(vh * 0.15);
+          const cw = Math.floor(vw * 0.7),  ch = Math.floor(vh * 0.7);
+          code = tryDecode(ctx.getImageData(cx, cy, cw, ch));
+        }
+
+        // Intento 3: imagen invertida
+        if (!code) {
+          const imgData = ctx.getImageData(0, 0, vw, vh);
+          for (let i = 0; i < imgData.data.length; i += 4) {
+            imgData.data[i]   = 255 - imgData.data[i];
+            imgData.data[i+1] = 255 - imgData.data[i+1];
+            imgData.data[i+2] = 255 - imgData.data[i+2];
+          }
+          code = tryDecode(imgData);
+        }
+
+        if (code) {
+          const now = Date.now();
+          if (now - lastScan > 2000) { // debounce 2s
+            lastScan = now;
+            processQR(code.data);
+          }
+        }
+      }
     }
     animFrame = requestAnimationFrame(scanLoop);
   }
 
+  function tryDecode(imgData) {
+    try {
+      return jsQR(imgData.data, imgData.width, imgData.height, {
+        inversionAttempts: 'attemptBoth'
+      });
+    } catch(e) { return null; }
+  }
+
   function processQR(raw) {
-    // Formato típico cédula chilena: "RUN=12345678-9" o variantes
-    const match = raw.match(/RUN[=:]?\s*([0-9]{7,8}-[0-9Kk])/i)
-                || raw.match(/([0-9]{7,8}-[0-9Kk])/); // fallback: solo el RUN
+    console.log('QR raw:', raw); // para debug
+    // Múltiples patrones del QR cédula chilena
+    const match =
+      raw.match(/RUN[=:\s]+([0-9]{7,8}-[0-9Kk])/i) ||
+      raw.match(/([0-9]{7,8}-[0-9Kk])/);
 
-    if (!match) return;
+    if (!match) {
+      showToast('QR leído pero sin RUN válido', true);
+      return;
+    }
     const run = match[1].toUpperCase();
-    if (seenRuns.has(run)) return;
-
+    if (seenRuns.has(run)) {
+      showToast(`RUN ${run} ya registrado`);
+      return;
+    }
     seenRuns.add(run);
     const now = new Date();
     const entry = {
       run,
       fecha: now.toLocaleDateString('es-CL'),
-      hora:  now.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      hora:  now.toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit', second:'2-digit' })
     };
     runs.push(entry);
     addRow(entry, runs.length);
     setStatus('ok', `RUN capturado: ${run}`);
-    showToast(`✓ RUN ${run} registrado`);
-    setTimeout(() => { if (scanning) setStatus('scanning', 'Escaneando...'); }, 2000);
+    showToast(`✓ ${run} registrado`);
+    // vibración en iPhone
+    if (navigator.vibrate) navigator.vibrate(100);
+    setTimeout(() => { if (scanning) setStatus('scanning','Escaneando...'); }, 2500);
   }
 
   function addRow(entry, n) {
@@ -480,22 +391,21 @@
     tr.innerHTML = `
       <td class="td-num">${n}</td>
       <td class="td-run">${entry.run}</td>
-      <td class="td-time">${entry.fecha} ${entry.hora}</td>
-      <td><button class="btn btn-ghost" style="padding:3px 8px;font-size:.75rem" onclick="deleteRow(this,'${entry.run}')">✕</button></td>`;
+      <td class="td-time">${entry.fecha}<br>${entry.hora}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="deleteRow(this,'${entry.run}')">✕</button></td>`;
+    tr.classList.add('flash');
     tbody.appendChild(tr);
-    tr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    tr.scrollIntoView({ behavior:'smooth', block:'nearest' });
     updateCount();
   }
 
   function deleteRow(btn, run) {
     const idx = runs.findIndex(r => r.run === run);
-    if (idx > -1) { runs.splice(idx, 1); seenRuns.delete(run); }
+    if (idx > -1) { runs.splice(idx,1); seenRuns.delete(run); }
     btn.closest('tr').remove();
-    if (runs.length === 0) tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state">Sin registros aún</div></td></tr>';
-    // renumber
-    [...tbody.querySelectorAll('tr')].forEach((tr, i) => {
-      const td = tr.querySelector('.td-num');
-      if (td) td.textContent = i + 1;
+    if (!runs.length) tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state">Sin registros aún</div></td></tr>';
+    [...tbody.querySelectorAll('tr')].forEach((tr,i) => {
+      const td = tr.querySelector('.td-num'); if (td) td.textContent = i+1;
     });
     updateCount();
   }
@@ -503,27 +413,25 @@
   function addManual() {
     const inp = document.getElementById('manualInput');
     const val = inp.value.trim().toUpperCase();
-    if (!val.match(/^[0-9]{7,8}-[0-9K]$/)) {
-      showToast('Formato inválido. Ej: 12345678-9', true); return;
-    }
+    if (!val.match(/^[0-9]{7,8}-[0-9K]$/)) { showToast('Formato inválido. Ej: 12345678-9', true); return; }
     if (seenRuns.has(val)) { showToast('RUN ya registrado', true); return; }
     seenRuns.add(val);
     const now = new Date();
     const entry = { run: val, fecha: now.toLocaleDateString('es-CL'),
-      hora: now.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) };
+      hora: now.toLocaleTimeString('es-CL', {hour:'2-digit',minute:'2-digit',second:'2-digit'}) };
     runs.push(entry);
     addRow(entry, runs.length);
-    showToast(`✓ RUN ${val} agregado`);
+    showToast(`✓ ${val} agregado`);
     inp.value = '';
   }
 
-  document.getElementById('manualInput').addEventListener('keydown', e => { if (e.key === 'Enter') addManual(); });
+  document.getElementById('manualInput').addEventListener('keydown', e => { if(e.key==='Enter') addManual(); });
 
   function updateCount() {
     const n = runs.length;
-    countB.textContent = `${n} registro${n !== 1 ? 's' : ''}`;
-    btnExp.disabled = n === 0;
-    btnClr.disabled = n === 0;
+    document.getElementById('countBadge').textContent = `${n} registro${n!==1?'s':''}`;
+    document.getElementById('btnExport').disabled = !n;
+    document.getElementById('btnClear').disabled  = !n;
   }
 
   function clearAll() {
@@ -534,20 +442,11 @@
   }
 
   function exportExcel() {
-    const data = [['N°', 'RUN', 'Fecha', 'Hora']];
-    runs.forEach((r, i) => data.push([i + 1, r.run, r.fecha, r.hora]));
-
+    const data = [['N°','RUN','Fecha','Hora']];
+    runs.forEach((r,i) => data.push([i+1, r.run, r.fecha, r.hora]));
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(data);
-
-    // column widths
-    ws['!cols'] = [{ wch: 6 }, { wch: 14 }, { wch: 14 }, { wch: 12 }];
-
-    // header style
-    ['A1','B1','C1','D1'].forEach(ref => {
-      if (ws[ref]) ws[ref].s = { font: { bold: true }, fill: { fgColor: { rgb: '1E40AF' } } };
-    });
-
+    ws['!cols'] = [{wch:6},{wch:14},{wch:14},{wch:12}];
     XLSX.utils.book_append_sheet(wb, ws, 'RUNs');
     const fname = `RUNs_${new Date().toLocaleDateString('es-CL').replace(/\//g,'-')}.xlsx`;
     XLSX.writeFile(wb, fname);
@@ -560,12 +459,12 @@
   }
 
   let toastTimer;
-  function showToast(msg, err = false) {
+  function showToast(msg, err=false) {
     const t = document.getElementById('toast');
     t.textContent = msg;
-    t.className = 'show' + (err ? ' error' : '');
+    t.className = 'show' + (err?' error':'');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => t.className = '', 2500);
+    toastTimer = setTimeout(() => t.className='', 2800);
   }
 </script>
 </body>
