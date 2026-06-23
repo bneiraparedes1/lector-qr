@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lector QR Cédula de Identidad</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --card: #22263a;
+    --accent: #3b82f6;
+    --accent2: #6366f1;
+    --success: #10b981;
+    --danger: #ef4444;
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --border: #2d3148;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  header {
+    width: 100%;
+    padding: 20px 24px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .logo {
+    width: 38px; height: 38px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  header h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; }
+  header p { font-size: 0.78rem; color: var(--muted); margin-top: 1px; }
+
+  main {
+    width: 100%;
+    max-width: 900px;
+    padding: 28px 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  @media (max-width: 640px) {
+    main { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .card-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* --- SCANNER --- */
+  .scanner-wrap {
+    position: relative;
+    background: #000;
+    aspect-ratio: 4/3;
+  }
+
+  #video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  #canvas { display: none; }
+
+  .scanner-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .finder {
+    width: 180px; height: 180px;
+    position: relative;
+  }
+
+  .finder::before, .finder::after,
+  .finder span::before, .finder span::after {
+    content: '';
+    position: absolute;
+    width: 28px; height: 28px;
+    border-color: var(--accent);
+    border-style: solid;
+  }
+
+  .finder::before  { top: 0;    left: 0;  border-width: 3px 0 0 3px; }
+  .finder::after   { top: 0;    right: 0; border-width: 3px 3px 0 0; }
+  .finder span::before { bottom: 0; left: 0;  border-width: 0 0 3px 3px; }
+  .finder span::after  { bottom: 0; right: 0; border-width: 0 3px 3px 0; }
+
+  .scan-line {
+    position: absolute;
+    left: 4px; right: 4px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    animation: sweep 2s ease-in-out infinite;
+    top: 4px;
+  }
+
+  @keyframes sweep {
+    0%   { top: 4px;   opacity: 1; }
+    90%  { top: 168px; opacity: 1; }
+    100% { top: 4px;   opacity: 0; }
+  }
+
+  .no-camera {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 4/3;
+    gap: 12px;
+    color: var(--muted);
+    font-size: 0.85rem;
+    text-align: center;
+    padding: 20px;
+  }
+
+  .no-camera .icon { font-size: 3rem; }
+
+  /* status pill */
+  .status-bar {
+    padding: 10px 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+  }
+
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .dot.scanning { background: var(--accent); animation: pulse 1.2s infinite; }
+  .dot.ok       { background: var(--success); }
+  .dot.idle     { background: var(--muted); }
+
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .btn {
+    border: none; cursor: pointer;
+    font-size: 0.82rem; font-weight: 600;
+    border-radius: 8px;
+    padding: 8px 16px;
+    transition: opacity .15s, transform .1s;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn:disabled { opacity: .4; cursor: default; }
+
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-success { background: var(--success); color: #fff; }
+  .btn-danger  { background: var(--danger);  color: #fff; }
+  .btn-ghost   { background: var(--border);  color: var(--text); }
+
+  /* --- TABLA --- */
+  .table-wrap {
+    overflow-y: auto;
+    max-height: 340px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.83rem;
+  }
+
+  thead th {
+    position: sticky; top: 0;
+    background: var(--surface);
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    border-bottom: 1px solid var(--border);
+  }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background .12s;
+  }
+
+  tbody tr:hover { background: rgba(59,130,246,.07); }
+
+  tbody td {
+    padding: 9px 14px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+  }
+
+  .td-num { color: var(--muted); width: 36px; }
+  .td-run { color: var(--accent); font-weight: 600; letter-spacing: .04em; }
+  .td-time { color: var(--muted); font-size: 0.75rem; font-family: inherit; }
+
+  .empty-state {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  /* bottom toolbar */
+  .toolbar {
+    padding: 12px 18px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .count-badge {
+    background: var(--border);
+    color: var(--muted);
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+
+  /* toast */
+  #toast {
+    position: fixed;
+    bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--success);
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: transform .3s;
+    pointer-events: none;
+    z-index: 99;
+    white-space: nowrap;
+  }
+
+  #toast.show { transform: translateX(-50%) translateY(0); }
+  #toast.error { background: var(--danger); }
+
+  /* manual input */
+  .manual-section {
+    padding: 12px 18px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+  }
+
+  .manual-section input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 0.85rem;
+    outline: none;
+    font-family: 'Courier New', monospace;
+  }
+
+  .manual-section input:focus { border-color: var(--accent); }
+  .manual-section input::placeholder { color: var(--muted); }
+
+  .span2 { grid-column: span 2; }
+  @media (max-width: 640px) { .span2 { grid-column: span 1; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🪪</div>
+  <div>
+    <h1>Lector QR — Cédula de Identidad</h1>
+    <p>Escanea el código QR del dorso de la cédula chilena</p>
+  </div>
+</header>
+
+<main>
+  <!-- CÁMARA -->
+  <div class="card">
+    <div class="card-header">📷 Cámara</div>
+    <div id="scannerArea">
+      <div class="no-camera" id="noCam">
+        <div class="icon">📷</div>
+        <div>Presiona <strong>Iniciar cámara</strong><br>para comenzar el escaneo</div>
+        <button class="btn btn-primary" onclick="startCamera()">Iniciar cámara</button>
+      </div>
+      <div class="scanner-wrap" id="scannerWrap" style="display:none">
+        <video id="video" playsinline autoplay muted></video>
+        <canvas id="canvas"></canvas>
+        <div class="scanner-overlay">
+          <div class="finder">
+            <span></span>
+            <div class="scan-line"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="status-bar">
+      <div class="dot idle" id="statusDot"></div>
+      <span id="statusText">Cámara inactiva</span>
+    </div>
+    <div class="manual-section">
+      <input type="text" id="manualInput" placeholder="RUN manual: 12345678-9" maxlength="12">
+      <button class="btn btn-ghost" onclick="addManual()">+ Agregar</button>
+    </div>
+  </div>
+
+  <!-- TABLA -->
+  <div class="card">
+    <div class="card-header">📋 RUNs capturados</div>
+    <div class="table-wrap">
+      <table id="runTable">
+        <thead>
+          <tr>
+            <th class="td-num">#</th>
+            <th>RUN</th>
+            <th>Hora</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <tr><td colspan="4"><div class="empty-state">Sin registros aún</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="toolbar">
+      <span class="count-badge" id="countBadge">0 registros</span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-danger" onclick="clearAll()" id="btnClear" disabled>Limpiar</button>
+        <button class="btn btn-success" onclick="exportExcel()" id="btnExport" disabled>⬇ Exportar Excel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- INSTRUCCIONES -->
+  <div class="card span2" style="padding:18px 20px">
+    <div style="font-size:0.82rem;color:var(--muted);display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px">
+      <div>
+        <div style="color:var(--text);font-weight:600;margin-bottom:4px">📌 ¿Cómo usar?</div>
+        Apunta la cámara al <strong>código QR del dorso</strong> de la cédula de identidad chilena. El RUN se captura automáticamente.
+      </div>
+      <div>
+        <div style="color:var(--text);font-weight:600;margin-bottom:4px">🔍 Formato QR</div>
+        El QR de la cédula chilena contiene texto como <code style="background:var(--border);padding:1px 5px;border-radius:4px">RUN=12345678-9</code>. La app extrae ese valor.
+      </div>
+      <div>
+        <div style="color:var(--text);font-weight:600;margin-bottom:4px">📊 Excel</div>
+        Los datos se exportan a <strong>.xlsx</strong> con columnas: N°, RUN, Fecha y Hora. Los duplicados se evitan automáticamente.
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+  let stream = null;
+  let scanning = false;
+  let animFrame = null;
+  const runs = [];
+  const seenRuns = new Set();
+
+  const video   = document.getElementById('video');
+  const canvas  = document.getElementById('canvas');
+  const ctx     = canvas.getContext('2d', { willReadFrequently: true });
+  const dot     = document.getElementById('statusDot');
+  const statusT = document.getElementById('statusText');
+  const tbody   = document.getElementById('tableBody');
+  const countB  = document.getElementById('countBadge');
+  const btnExp  = document.getElementById('btnExport');
+  const btnClr  = document.getElementById('btnClear');
+
+  async function startCamera() {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } }
+      });
+      video.srcObject = stream;
+      document.getElementById('noCam').style.display = 'none';
+      document.getElementById('scannerWrap').style.display = 'block';
+      scanning = true;
+      setStatus('scanning', 'Escaneando...');
+      scanLoop();
+    } catch (e) {
+      showToast('No se pudo acceder a la cámara', true);
+    }
+  }
+
+  function scanLoop() {
+    if (!scanning) return;
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width  = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+      if (code) processQR(code.data);
+    }
+    animFrame = requestAnimationFrame(scanLoop);
+  }
+
+  function processQR(raw) {
+    // Formato típico cédula chilena: "RUN=12345678-9" o variantes
+    const match = raw.match(/RUN[=:]?\s*([0-9]{7,8}-[0-9Kk])/i)
+                || raw.match(/([0-9]{7,8}-[0-9Kk])/); // fallback: solo el RUN
+
+    if (!match) return;
+    const run = match[1].toUpperCase();
+    if (seenRuns.has(run)) return;
+
+    seenRuns.add(run);
+    const now = new Date();
+    const entry = {
+      run,
+      fecha: now.toLocaleDateString('es-CL'),
+      hora:  now.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    };
+    runs.push(entry);
+    addRow(entry, runs.length);
+    setStatus('ok', `RUN capturado: ${run}`);
+    showToast(`✓ RUN ${run} registrado`);
+    setTimeout(() => { if (scanning) setStatus('scanning', 'Escaneando...'); }, 2000);
+  }
+
+  function addRow(entry, n) {
+    if (n === 1) tbody.innerHTML = '';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="td-num">${n}</td>
+      <td class="td-run">${entry.run}</td>
+      <td class="td-time">${entry.fecha} ${entry.hora}</td>
+      <td><button class="btn btn-ghost" style="padding:3px 8px;font-size:.75rem" onclick="deleteRow(this,'${entry.run}')">✕</button></td>`;
+    tbody.appendChild(tr);
+    tr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    updateCount();
+  }
+
+  function deleteRow(btn, run) {
+    const idx = runs.findIndex(r => r.run === run);
+    if (idx > -1) { runs.splice(idx, 1); seenRuns.delete(run); }
+    btn.closest('tr').remove();
+    if (runs.length === 0) tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state">Sin registros aún</div></td></tr>';
+    // renumber
+    [...tbody.querySelectorAll('tr')].forEach((tr, i) => {
+      const td = tr.querySelector('.td-num');
+      if (td) td.textContent = i + 1;
+    });
+    updateCount();
+  }
+
+  function addManual() {
+    const inp = document.getElementById('manualInput');
+    const val = inp.value.trim().toUpperCase();
+    if (!val.match(/^[0-9]{7,8}-[0-9K]$/)) {
+      showToast('Formato inválido. Ej: 12345678-9', true); return;
+    }
+    if (seenRuns.has(val)) { showToast('RUN ya registrado', true); return; }
+    seenRuns.add(val);
+    const now = new Date();
+    const entry = { run: val, fecha: now.toLocaleDateString('es-CL'),
+      hora: now.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) };
+    runs.push(entry);
+    addRow(entry, runs.length);
+    showToast(`✓ RUN ${val} agregado`);
+    inp.value = '';
+  }
+
+  document.getElementById('manualInput').addEventListener('keydown', e => { if (e.key === 'Enter') addManual(); });
+
+  function updateCount() {
+    const n = runs.length;
+    countB.textContent = `${n} registro${n !== 1 ? 's' : ''}`;
+    btnExp.disabled = n === 0;
+    btnClr.disabled = n === 0;
+  }
+
+  function clearAll() {
+    if (!confirm(`¿Eliminar los ${runs.length} registros?`)) return;
+    runs.length = 0; seenRuns.clear();
+    tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state">Sin registros aún</div></td></tr>';
+    updateCount();
+  }
+
+  function exportExcel() {
+    const data = [['N°', 'RUN', 'Fecha', 'Hora']];
+    runs.forEach((r, i) => data.push([i + 1, r.run, r.fecha, r.hora]));
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(data);
+
+    // column widths
+    ws['!cols'] = [{ wch: 6 }, { wch: 14 }, { wch: 14 }, { wch: 12 }];
+
+    // header style
+    ['A1','B1','C1','D1'].forEach(ref => {
+      if (ws[ref]) ws[ref].s = { font: { bold: true }, fill: { fgColor: { rgb: '1E40AF' } } };
+    });
+
+    XLSX.utils.book_append_sheet(wb, ws, 'RUNs');
+    const fname = `RUNs_${new Date().toLocaleDateString('es-CL').replace(/\//g,'-')}.xlsx`;
+    XLSX.writeFile(wb, fname);
+    showToast(`📊 ${fname} descargado`);
+  }
+
+  function setStatus(type, text) {
+    dot.className = 'dot ' + type;
+    statusT.textContent = text;
+  }
+
+  let toastTimer;
+  function showToast(msg, err = false) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'show' + (err ? ' error' : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.className = '', 2500);
+  }
+</script>
+</body>
+</html>
